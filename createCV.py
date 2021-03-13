@@ -9,6 +9,11 @@ import os,io,sys,pathlib
 import pandas as pd
 
 from fpdf import FPDF
+from datetime import datetime
+
+sys.path.append("C:\\Users\\pc\\Documents\\Python Scripts\\misc\\wordstats\\")
+
+import wordstats
 
 fonts = os.listdir('font/')
 icons = os.listdir('icon/')
@@ -36,7 +41,7 @@ def parseText():
         data["command"].append(com)
         data["args"].append(arg)
         
-        if com == "list":
+        if com in ["list","headlist"]:
             data["values"].append(val.split("\n"))
         else:
             data["values"].append(val)
@@ -45,18 +50,19 @@ def parseText():
         
     return(data)
 
-class CV:
+class CV(FPDF):
     
-    def __init__(self,
+    #need to extend FPDF for footer to function properly
+    
+    def inert(self,
                  maincolour = [60,60,60],
-                 textcolour = [110,110,110],
+                 textcolour = [90,90,90],
                  lightcolour = [140,140,140],
                  accentcolour = [210,60,60]):
         
         #### debug ####
         debug = False
         ###############
-        
         
         self.colours = {"main":maincolour,
                         "text":textcolour,
@@ -65,13 +71,14 @@ class CV:
         
         self.fontsizes = {"name":32,
                           "heading":14,
-                          "subheading":12,
+                          "subheading":10,
                           "text":9,
                           "contact":7.6}
         
-        self.cv = FPDF(orientation='P', unit='mm', format='A4')
+        # self = FPDF(orientation='P', unit='mm', format='A4')
+                
+        self.version = "v0.0.1"
         
-        self.sizing()
         self.addFonts()
         self.inset = 14
         self.margin = 2.5
@@ -79,21 +86,22 @@ class CV:
         self.placement = {"x":0,"y":0}
         
         
-        self.cv.add_page()
+        self.font_bold = "Roboto-Bold"
+        self.font_norm = "Roboto-Light"
+        
+            
+        self.content = parseText()
+        
+        self.userName = self.content.loc[(self.content["command"] == "info") &
+                                         (self.content["args"] == "name")]["values"][0]
+        
+        self.add_page()
         
         if debug:
             self.enableDebug()
         else:
             self.b = 0
             
-            
-            
-            
-            
-            
-        
-        self.content = parseText()
-        
         storage = {}
         store = None
         i = 0
@@ -120,15 +128,39 @@ class CV:
                     self.addTitleSection(name, addr, num, email, git)
                     
                     store = None                    
-                    
-            if com == "bulktext":
+               
+            if com == "newpage":
                 
+                #force new page by writing empty string to end of page and resetting y
+                self.textCell(x=self.inset,y = self.h,text="",font="Roboto-Thin")
+                self.updatePlacement(y = self.inset)
+               
+            if com == "subheading":
+                
+                self.addHeader(arg,sub=True)
+                    
+            if com == "heading":
                 self.addHeader(arg)
+                
+            if com == "bulktext":                
                 self.addBulkText(val)
                 
-            if com == "dated":
+            if com == "list":
                 
-                self.addHeader(arg)
+                print("create list:")
+                print("\t",arg,val)
+                
+                self.addList(val, extramargin = 3)
+                
+            if com == "headlist":
+                
+                print("create headed list:")
+                print("\t",arg,val)
+                
+                self.addList(val, extramargin = 3, headings = True)
+                
+                
+            if com == "dated":        
                 
                 #stretch down the content until end of date block is found
                 j = i
@@ -166,20 +198,30 @@ class CV:
                 
             i += 1
         
+    def updatePlacement(self,x=None,y=None):
+        
+        if not x:
+            newx = self.get_x()
+        else:
+            newx = x
+            
+        if not y:
+            newy = self.get_y()
+        else:
+            newy = y
+        
+        if newy > self.h:
+            y = self.inset
+        
+        self.placement = {"x":newx,"y":newy}
+        
     def enableDebug(self):
         
         self.b = 1
         
         #draw width margins
-        self.cv.line(self.inset,0,self.inset,self.h)
-        self.cv.line(self.w - self.inset,0,self.w - self.inset,self.h)
-                
-        
-    def sizing(self):
-        
-        self.w = self.cv.w
-        self.h = self.cv.h
-        self.size = [self.w,self.h]
+        self.line(self.inset,0,self.inset,self.h)
+        self.line(self.w - self.inset,0,self.w - self.inset,self.h)
         
     def addFonts(self):
         
@@ -190,29 +232,40 @@ class CV:
             if ttype in ["ttf"]:
                 path = str(pathlib.Path().absolute()) + "\\font\\" + fontName
                 
-                self.cv.add_font(family=name,fname=path, uni= True)
+                self.add_font(family=name,fname=path, uni= True)
         
         
     def footer(self):
         print("drawing footer "+"#"*24)
         # Go to 1.5 cm from bottom
-        self.cv.set_y(-15)
+        self.set_y(-15)
         
-        self.cv.set_font('Roboto-Thin', size = 8)
-        # Print centered page number
-        # self.cv.cell(0, 10, 'Page %s' % self.cv.page_no(), 0, 0, 'C')
+        self.set_font('Roboto-Regular', size = self.fontsizes["contact"])
         
-        self.cv.rect(10,10,100,100)
+        #print centered "name    cv"
+        footerText = "{}    ~    {}".format(self.userName, "Curriculum Vitae")
+        self.cell(0, 10, footerText, align = 'C')
+        
+        # Print page number on right        
+        pageNo = "Page {}/{}".format(self.page_no(),self.alias_nb_pages())
+        width = self.get_string_width(pageNo)
+        self.set_x(self.w - self.inset- width)
+        self.cell(width, 10, pageNo, align = 'L')
             
+        #might as well self credit
+        version = "Compiled {}".format(datetime.now().strftime("%d %B, %Y"))
+        self.set_x(self.inset)
+        self.cell(width, 10, version, align = 'L')
+        
         
     def detailColumn(self,fraction = 0.33):
         
         x2 = round(self.w * fraction)
         y2 = self.h
         
-        self.cv.set_fill_color(*self.colours["accent"])
+        self.set_fill_color(*self.colours["accent"])
         
-        self.cv.rect(0,0,x2,y2,"F")
+        self.rect(0,0,x2,y2,"F")
         
     def textCell(self,x,y,text,font,size="text",colour="main",align = 'L',link=None):
         
@@ -227,9 +280,9 @@ class CV:
         margin = self.margin
         vmargin = self.vmargin
         
-        self.cv.set_font(font,size=fontsize)
+        self.set_font(font,size=fontsize)
         
-        twidth = self.cv.get_string_width(text)
+        twidth = self.get_string_width(text)
         
         # print(text,twidth)
         
@@ -251,45 +304,53 @@ class CV:
         if x < inset:
             x = inset
         
-        self.cv.set_xy(x,y)
-        self.cv.set_text_color(*fontcol)
-        self.cv.cell(w=twidth, h=(vmargin/2)+fontsize*ptmm, align=align, txt=text, border=self.b, link = link)
+        self.set_xy(x,y)
+        self.set_text_color(*fontcol)
+        self.cell(w=twidth, h=(vmargin/2)+fontsize*ptmm, align=align, txt=text, border=self.b, link = link)
     
-        self.placement = {"x":x,"y":y + vmargin+fontsize*ptmm}
+        self.updatePlacement(y=y + vmargin+fontsize*ptmm)
         
     
-    def addHeader(self,heading):
-        
-        y = self.placement["y"] + 6
+    def addHeader(self,heading,sub=False):
         
         ptmm = 0.352778
         
-        fontsize = self.fontsizes["heading"]
+        if sub:
+            fontsize = self.fontsizes["subheading"]
+            self.set_font("Roboto-Bold",size=fontsize)
+            y = self.placement["y"] + 3
+            print("adding subheading {}... at y={}".format(heading,y))
+            
+        else:
+            fontsize = self.fontsizes["heading"]
+            self.set_font("Roboto-Bold",size=fontsize)
+            y = self.placement["y"] + 6
+            print("adding heading {}... at y={}".format(heading,y))
+        
+        
         fontcol = self.colours["main"]
         
         inset = self.inset
         margin = self.margin
         vmargin = self.vmargin
         
-        self.cv.set_font("Roboto-Bold",size=fontsize)
-        twidth = self.cv.get_string_width(heading)
-        self.cv.set_xy(inset,y)
-        self.cv.set_text_color(*fontcol)
-        self.cv.cell(w=twidth+margin, h=(vmargin)+fontsize*ptmm,txt=heading,border=self.b)
+        twidth = self.get_string_width(heading)
+        self.set_xy(inset,y)
+        self.set_text_color(*fontcol)
+        self.cell(w=twidth+margin, h=(vmargin)+fontsize*ptmm,txt=heading,border=self.b)
         
         #x at edge margin
         x = inset+twidth + margin
         y =  y-(margin/4)+fontsize*ptmm
         
-        self.cv.set_draw_color(*self.colours["main"])
-        self.cv.line(x,y ,self.w-inset,y)
+        self.set_draw_color(*self.colours["main"])
+        if not sub:
+            self.line(x,y ,self.w-inset,y)
         
-        self.placement["y"] = y
+        self.updatePlacement(y=y)
         
     def addName(self, name, bold = "last"):
         
-        font_bold = "Roboto-Bold"
-        font_norm = "Roboto-Thin"
         
         name = name.split(" ")
         
@@ -297,12 +358,12 @@ class CV:
         sizes = [0]
         for i in range(len(name)):
             if (i == len(name) -1) and (bold == "last"):
-                self.cv.set_font(font_norm,size = self.fontsizes["name"])
+                self.set_font(self.font_norm,size = self.fontsizes["name"])
             else:
-                self.cv.set_font(font_bold,size = self.fontsizes["name"])
+                self.set_font(self.font_bold,size = self.fontsizes["name"])
             
             temp = name[i]
-            sizes.append(self.cv.get_string_width(temp))
+            sizes.append(self.get_string_width(temp))
         
         
         midx = self.w/2
@@ -313,9 +374,9 @@ class CV:
             x+= i*2 #extra spacing
             
             if (i == len(name) -1) and (bold == "last"):
-                self.textCell(x, 6, temp, "Roboto-Bold", size = "name", align = "R")
+                self.textCell(x, 6, temp, self.font_bold, size = "name", align = "R")
             else:
-                self.textCell(x, 6, temp, "Roboto-Thin", size = "name", align = "R")
+                self.textCell(x, 6, temp, self.font_norm, size = "name", align = "R")
     
     def addContacts(self,mob,email,git=None):
         data = {}
@@ -329,8 +390,8 @@ class CV:
         
         font = "Roboto-Regular"
         
-        self.cv.set_font(font,size = self.fontsizes["contact"])
-        self.cv.set_text_color(*self.colours["main"])
+        self.set_font(font,size = self.fontsizes["contact"])
+        self.set_text_color(*self.colours["main"])
         sizes = [0]
         
         i = 0
@@ -342,7 +403,7 @@ class CV:
                 
             text += item +": " + data[item]
             
-            sizes.append(self.cv.get_string_width(text))
+            sizes.append(self.get_string_width(text))
             
             i += 1            
         
@@ -384,35 +445,76 @@ class CV:
         self.addContacts(num, email, git)
         
         
-    def addBulkText(self,text,font = "Roboto-Thin", extramargin = 3):
+    def addBulkText(self,text,font = "Roboto-Light", extramargin = 3):
         
         text = text.replace("\n", " ")
         
         x = self.inset
         y = self.placement["y"] + extramargin
         
-        self.cv.set_xy(x,y)
-        self.cv.set_font(font)
-        self.cv.set_font_size(self.fontsizes["text"])
+        self.set_xy(x,y)
+        self.set_font(font)
+        self.set_text_color(*self.colours["text"])
+        self.set_font_size(self.fontsizes["text"])
         h = self.fontsizes["text"]/2
         w = self.w - self.inset*2
         
-        self.cv.multi_cell(w,h,text,border=self.b)
+        self.multi_cell(w,h,text,border=self.b)
         
-        self.placement["y"] = self.cv.get_y()
+        self.updatePlacement()
         
-    def addList(self,listvals,font = "Roboto-Thin"):
-        
-        x = self.inset + 4
+    def addList(self,listvals,font = "Roboto-Light", extramargin = 0, headings = False):        
         
         
-        for item in listvals:
-            y = self.placement["y"]
+        ptmm = 0.352778
+        
+        self.updatePlacement(y=self.placement["y"] + extramargin)
+        
+        if not headings:
+            for item in listvals:
+                
+                item = "• " + item
+                
+                self.addBulkText(item, font, extramargin = 0)
+                
+        else:
+            basey = self.placement["y"]
             
-            item = "• " + item
+            # self.font_bold = "Roboto-Bold"
+            # self.font_norm = "Roboto-Thin"
+            heads = []
+            bodies = []
+            for item in listvals:
+                heads.append(item.split("-")[0].strip())
+                bodies.append(item.split("-")[1].strip())
+                
+            #find longest heading to index from
+            maxlen = max(heads, key=len)
             
-            self.textCell(x, y, item, font)
-        
+            fsize = self.fontsizes["text"]            
+            self.set_font(self.font_bold)
+            self.set_font_size(fsize)
+            
+            maxw = self.get_string_width(maxlen)
+            midx = self.inset + maxw + self.margin
+            
+            for i in range(len(heads)):
+                x = midx
+                y = basey + i*fsize/2
+                
+                print(x,y)
+                self.set_xy(x,y)
+                self.cell(maxw, ptmm*fsize, txt = heads[i], border=self.b, align = "R")
+                
+            self.set_font(self.font_norm)
+            for i in range(len(bodies)):                
+                
+                x = midx + maxw
+                y = basey + i*fsize/2
+                
+                print(x,y)
+                self.set_xy(x,y)
+                self.cell(maxw, ptmm*fsize, txt = bodies[i], border=self.b, align = "L")
         
     def addDateBlock(self,block):
         #constant functions to head the block
@@ -466,7 +568,11 @@ class CV:
             val = subs[com][1]
             if com == "bulktext":
                 
-                self.addBulkText(val, extramargin = 1)
+                self.addBulkText(val, extramargin = 1)     
+                    
+            if com == "subheading":
+                
+                self.addHeader(arg,sub=True)
                 
             if com == "list":
                 
@@ -476,13 +582,30 @@ class CV:
                 self.addList(val)
         
     def save(self):
-        self.cv.output("testcv.pdf")
+        self.output("testcv.pdf")
     
     
     
 if __name__ == "__main__":
     
     cv = CV()    
+    cv.inert()
     cv.save()
+    """
+    print("\n"+"#"*24)
+    print("scanning CV text contents for repeated language")
+    print("#"*24)
     
     content = parseText()
+    
+    bulkcontent = list(content.loc[content["command"].isin(("bulktext","list"))]["values"])
+    
+    prescan = ""
+    for item in bulkcontent:
+        if type(item) == list:
+            prescan += " ".join(item)
+            
+        else:
+            prescan += item
+            
+    wordstats.process(prescan,False)"""
