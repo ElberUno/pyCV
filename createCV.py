@@ -1,23 +1,24 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Mar 11 15:11:00 2021
+Created on Sat Mar 13 19:22:13 2021
 
 @author: Louis Beal
 """
 
-import os,io,sys,pathlib
+import os,io,sys,pathlib,math
 import pandas as pd
+import numpy as np
 
 from fpdf import FPDF
 from datetime import datetime
 
-sys.path.append("C:\\Users\\pc\\Documents\\Python Scripts\\misc\\wordstats\\")
-
-import wordstats
-
 fonts = os.listdir('font/')
 icons = os.listdir('icon/')
 
+
+#### debug ####
+debug = False
+###############
 
 def parseText():
     
@@ -49,61 +50,58 @@ def parseText():
     data = pd.DataFrame(data)
         
     return(data)
-
-class CV(FPDF):
+        
+class PDF(FPDF):
     
     #need to extend FPDF for footer to function properly
-    
-    def inert(self,
-                 maincolour = [60,60,60],
-                 textcolour = [90,90,90],
-                 lightcolour = [140,140,140],
-                 accentcolour = [210,60,60]):
+
+    def create(self,
+               maincolour = [60,60,60],
+               textcolour = [90,90,90],
+               lightcolour = [140,140,140],
+               accentcolour = [210,60,60]):
         
-        #### debug ####
-        debug = False
-        ###############
+        #driver function to read in data and compile the PDF
         
-        self.colours = {"main":maincolour,
+        
+        #supplimentary data
+        self.version = "v0.0.2"
+        
+        #templating, set colours, font sizes and font tables
+        self.colour = {"main":maincolour,
                         "text":textcolour,
                         "light":lightcolour,
                         "accent":accentcolour}
         
-        self.fontsizes = {"name":32,
+        self.fontsize = {"name":32,
                           "heading":14,
-                          "subheading":10,
-                          "text":9,
+                          "subheading":12,
+                          "text":10,
                           "contact":7.6}
         
-        # self = FPDF(orientation='P', unit='mm', format='A4')
-                
-        self.version = "v0.0.1"
+        self.font = {"bold":"Roboto-Bold",
+                     "thin":"Roboto-Thin",
+                     "text":"Roboto-Regular",
+                     "italic":"Roboto-Italic"}
         
-        self.addFonts()
-        self.inset = 14
-        self.margin = 2.5
-        self.vmargin = 0.5
-        self.placement = {"x":0,"y":0}
+        #init blank pdf
+        self.initialisation()
+        #set layout settings
+        self.layout()
         
-        
-        self.font_bold = "Roboto-Bold"
-        self.font_norm = "Roboto-Light"
-        
-            
-        self.content = parseText()
-        
-        self.userName = self.content.loc[(self.content["command"] == "info") &
-                                         (self.content["args"] == "name")]["values"][0]
-        
-        self.add_page()
-        
+        #enable/disable debug constructs
         if debug:
             self.enableDebug()
         else:
             self.b = 0
-            
-        storage = {}
-        store = None
+        
+        #process commands
+        
+        self.commandState = "run"
+        self.store = []
+        self.temp = {}
+        self.textContent = ""
+        
         i = 0
         while i < len(self.content):
             
@@ -111,119 +109,89 @@ class CV(FPDF):
             arg = self.content.iat[i,1]
             val = self.content.iat[i,2]
             
-            if com == "info":
-                
-                storage[arg.lower()] = val                
-                store = "info"
-                
-            elif store:
-                if store == "info":
-                    
-                    name = storage["name"]
-                    addr = storage["address"]
-                    num = storage["mobile"]
-                    email = storage["email"]
-                    git = storage["github"]
-                    
-                    self.addTitleSection(name, addr, num, email, git)
-                    
-                    store = None                    
-               
-            if com == "newpage":
-                
-                #force new page by writing empty string to end of page and resetting y
-                self.textCell(x=self.inset,y = self.h,text="",font="Roboto-Thin")
-                self.updatePlacement(y = self.inset)
-               
-            if com == "subheading":
-                
-                self.addHeader(arg,sub=True)
-                    
-            if com == "heading":
-                self.addHeader(arg)
-                
-            if com == "bulktext":                
-                self.addBulkText(val)
-                
-            if com == "list":
-                
-                print("create list:")
-                print("\t",arg,val)
-                
-                self.addList(val, extramargin = 3)
-                
-            if com == "headlist":
-                
-                print("create headed list:")
-                print("\t",arg,val)
-                
-                self.addList(val, extramargin = 3, headings = True)
-                
-                
-            if com == "dated":        
-                
-                #stretch down the content until end of date block is found
-                j = i
-                
-                #create blocks
-                blocks = []
-                temp = {}
-                while self.content.iat[j,0] != "enddated":
-                    
-                    com = self.content.iat[j,0]
-                    arg = self.content.iat[j,1]
-                    val = self.content.iat[j,2]
-                    
-                    print(com)
-                    
-                    if com == "nextdated":
-                        blocks.append(temp)
-                        temp = {}
-                    else:
-                        temp[com] = (arg,val)
-                    
-                    j+=1                    
-                    if j > len(self.content):
-                        
-                        raise Exception("No end to dated block found")                        
-                        break
-                
-                i = j #skip processed lines and continue
-                
-                blocks.append(temp)
-                
-                for block in blocks:
-                    
-                    self.addDateBlock(block)
-                
+            self.processCommand(com,arg,val)
+            
             i += 1
         
-    def updatePlacement(self,x=None,y=None):
+        self.save()
         
-        if not x:
-            newx = self.get_x()
-        else:
-            newx = x
+    def initialisation(self):
+        #initialise a blank PDF for compilation        
+        self.addFonts() #add fonts
+        self.set_margins(0,0,0) #remove automatic margins
+        
+        #set manual margins and x/y spacing for cells
+        self.xbuffer = 2.5
+        self.ybuffer = 1
+        
+        #placement cursor, keep track for sequential cell addition
+        self.cursor = {"x":0,"y":0}
+        
+        #parse content into commands, arguments and text
+        self.content = parseText()
+        
+        #extract needed info such as document type, name, footer info, etc.
+        self.userName = self.extractFromContent("info","name")        
+        self.footerType = self.extractFromContent("footer")            
+        self.sidebar = self.extractFromContent("sidebar")
+        
+        
+        self.add_page()
+                
+        self.set_xy(0,0)
+        
+    def layout(self):
+        
+        #set margins, using internal margins
+        
+        if self.sidebar:
+            #using a sidebar, start here by cutting the page
             
-        if not y:
-            newy = self.get_y()
+            self.set_fill_color(*self.colour["accent"])
+            self.rect(0,0,self.w/3,self.h,"F")
+            self.width = self.w/3
+            
+            self.margins = 2
+            
         else:
-            newy = y
+            self.margins = 14
+            self.width = self.w
+            
+        self.vmargins = 10
         
-        if newy > self.h:
-            y = self.inset
+        self.l_margin = self.margins
+        self.r_margin = self.margins
+        self.t_margin = self.vmargins
+        self.b_margin = self.vmargins
         
-        self.placement = {"x":newx,"y":newy}
+        self.c_margin = 0 #seems to be the offset for text within a cell
+                    
+        self.edge = {"l": self.l_margin,
+                     "t": self.t_margin,
+                     "r": self.width - self.r_margin,
+                     "b": self.h - self.b_margin}
         
-    def enableDebug(self):
+        self.set_xy(self.l_margin,self.t_margin)
         
-        self.b = 1
+    def extractFromContent(self,command,args=None):
+        #extract data from selected command
         
-        #draw width margins
-        self.line(self.inset,0,self.inset,self.h)
-        self.line(self.w - self.inset,0,self.w - self.inset,self.h)
-        
+        if not args:
+            
+            if command in list(self.content["command"]):
+                val = self.content.loc[(self.content["command"] == command)]["args"].values[0]
+                return val.lower() != "false"
+            else:
+                return None
+            
+        else:
+            
+            return self.content.loc[(self.content["command"] == command) & 
+                                    (self.content["args"] == args)]["values"].values[0]
+    
     def addFonts(self):
+        
+        #read in fonts and add them to the PDF for usage
         
         for fontName in fonts:
             name = fontName.split(".")[0]
@@ -234,288 +202,443 @@ class CV(FPDF):
                 
                 self.add_font(family=name,fname=path, uni= True)
         
+    def enableDebug(self):
+        
+        self.b = 1
+        
+        self.rectCoord(self.l_margin,
+                       self.t_margin,
+                       self.width-self.r_margin,
+                       self.h-self.b_margin)
+        
+    def processCommand(self,com,arg,val):
+        
+        #command states override other commands
+        #allows for nested items
+        state = self.commandState
+        if state == "dated":
+            
+            if com == "enddated":
+                
+                self.commandState = "run"
+                self.store.append(self.temp)
+                self.temp = {}
+                for block in self.store:
+                    
+                    self.addDateBlock(block)
+                    
+                self.store = []
+                    
+            elif com == "nextdated":
+                self.store.append(self.temp)
+                self.temp = {}
+                
+            else:
+                self.temp[com] = (arg,val)
+                
+        elif state == "info":
+            
+            #if the info flag is set, but a new command is passed
+            #process info block and process the current command using recursion
+            if com != "info":
+                
+                self.addInfo()
+                
+                self.commandState = "run"                
+                self.processCommand(com,arg,val)
+                
+            else:                
+                self.temp[arg] = val
+        
+        
+        else:
+            if com == "newpage":
+                
+                #force new page by writing empty string to end of page and resetting y
+                self.addText(text="",x=self.l_margin,y = self.h,font="thin")
+                self.set_y(self.t_margin)
+                
+            elif com == "info":
+                self.commandState = "info"
+                self.processCommand(com,arg,val)
+            
+            elif com == "subheading":                
+                self.addHeader(arg,sub=True)
+                    
+            elif com == "heading":
+                self.addHeader(arg)
+                
+            elif com == "bulktext":                
+                self.addText(val)
+                
+            elif com == "dated":        
+                print("\tstarting date block")
+                self.commandState = "dated"
+                    
+            elif com == "list":                
+                print("create list:")
+                print("\t",arg,val)
+                
+                self.addList(val)
+                
+            elif com == "headlist":                
+                print("create headed list:")
+                print("\t",arg,val)
+                
+                self.addList(val, headings = True)            
+    
+    #### override default functions ####    
+    def set_x(self, x):
+        #Set x position
+        if(x>=0):
+            self.x=x
+        else:
+            self.x=self.w-x    
+            
+    def set_y(self, y):
+        #Set y position
+        # print("\t\ty set to {}".format(y))
+        self.x=self.l_margin
+        if(y>=0):
+            self.y=y
+        else:
+            self.y=self.h-y
+    
+    def step_y(self,step=None):
+        
+        if not step:
+            step = self.ybuffer
+            
+        y = self.get_y()
+        self.set_y(y+step)
+    
+    def set_xy(self, x,y):
+        "Set x and y positions"
+        self.set_y(y)
+        self.set_x(x)
         
     def footer(self):
-        print("drawing footer "+"#"*24)
-        # Go to 1.5 cm from bottom
-        self.set_y(-15)
+        #replace FPDF footer class with manual footer
+        #called by add_page and output
         
-        self.set_font('Roboto-Regular', size = self.fontsizes["contact"])
-        
-        #print centered "name    cv"
-        footerText = "{}    ~    {}".format(self.userName, "Curriculum Vitae")
-        self.cell(0, 10, footerText, align = 'C')
-        
-        # Print page number on right        
-        pageNo = "Page {}/{}".format(self.page_no(),self.alias_nb_pages())
-        width = self.get_string_width(pageNo)
-        self.set_x(self.w - self.inset- width)
-        self.cell(width, 10, pageNo, align = 'L')
+        if self.footerType:
             
-        #might as well self credit
-        version = "Compiled {}".format(datetime.now().strftime("%d %B, %Y"))
-        self.set_x(self.inset)
-        self.cell(width, 10, version, align = 'L')
+            edgeStore = self.edge["r"]
+            self.edge["r"] = self.w
+            oldCommand = self.commandState
+            self.commandState = "footer"
         
+            print("drawing footer "+"#"*24)
+            
+            y = self.h - 10
+            
+            #print centered "name    cv"
+            footerText = "{}    ~    {}".format(self.userName, "Curriculum Vitae")
+            x = self.w/2
+            self.addText(footerText,x,y,font = "text",
+                         size="contact",colour= "light",align = [0.5,0])
+            
+            # Print page number on right        
+            pageNo = "Page {}/{}".format(self.page_no(),self.alias_nb_pages())
+            x = self.w - self.margins
+            self.addText(pageNo,x,y,font = "text",
+                         size="contact",colour= "light",align = [1,0])
+                
+            #might as well self credit
+            version = "Compiled {}".format(datetime.now().strftime("%d %B, %Y"))        
+            x = self.margins
+            self.addText(version,x,y,font = "text",
+                         size="contact",colour= "light")
+            
+            self.commandState = oldCommand
+            self.edge["r"] = edgeStore
         
-    def detailColumn(self,fraction = 0.33):
+    #### internal placement functions ####
         
-        x2 = round(self.w * fraction)
-        y2 = self.h
+    def drawCross(self,x,y,r=1,rot=0):
         
-        self.set_fill_color(*self.colours["accent"])
+        if rot !=0:
+            self.rotate(-rot,x,y)
         
-        self.rect(0,0,x2,y2,"F")
+        self.line(x-r,y-r,x+r,y+r)
+        self.line(x-r,y+r,x+r,y-r)
         
-    def textCell(self,x,y,text,font,size="text",colour="main",align = 'L',link=None):
+        if rot !=0:
+            self.rotate(0,x,y)
         
-        print("creating text cell ({}...) at {}, {}".format(text[:5],round(x,2),round(y,2)))
+    
+    def rectCoord(self,x1,y1,x2,y2, mode = "D"):
         
-        ptmm = 0.352778
+        #draw rectangle by coordinates rather than w,h
         
-        fontsize = self.fontsizes[size]
-        fontcol = self.colours[colour]
+        #ensure correct placement order
         
-        inset = self.inset
-        margin = self.margin
-        vmargin = self.vmargin
+        xa = max(x1,x2)
+        ya = max(y1,y2)
+        xb = min(x1,x2)
+        yb = min(y1,y2)
         
-        self.set_font(font,size=fontsize)
+        w = xb - xa
+        h = yb - ya
         
-        twidth = self.get_string_width(text)
+        self.rect(xa,ya,w,h,mode)
+    
+    def addInfo(self):
         
-        # print(text,twidth)
+        info = self.temp
         
-        if align[0] == "L":
-            x -= (twidth + margin/2)
-        elif align[0] == "C":
-            x -= twidth/2
-        else:
-            x += margin/2
-         
-        if len(align) > 1:
-            if align[1] == "U":            
-                y -= (fontsize*ptmm)
+        self.temp = {}
+        
+        print("adding info block")
+        
+        #colour, size, font
+        styles = {"name":[["light","main"],["name","name"],["text","bold"]],
+                  "address":["light","contact","italic"],
+                  "other":["main","contact","text"]}
+        
+        store = []
+        links = []
+        for key in info.keys():
+            
+            val = info[key]
+            
+            if key not in styles.keys():
+                oldkey = key
+                key = "other"
+                
+            colour = styles[key][0]
+            size = styles[key][1]
+            font = styles[key][2]
+            
+            midx = self.width/2
+            if key == "name":                
+                #name needs unique spacing and formatting
+                
+                fname = " ".join(val.split(" ")[:-1])
+                lname = val.split(" ")[-1]
+                
+                name = [fname,lname]
+                
+                self.addText(name,x=midx,font=font,size=size,colour=colour)
+                
+            elif key == "address":
+                
+                self.addText(val,x=midx,font=font,size=size,colour=colour,align=[0.5,0])
+                
             else:
-                y += vmargin/2
-        else:
-            y += vmargin/2
+                
+                store.append(oldkey + ": " + val)
+                
+                if oldkey.lower() in ["git","github"]:
+                    links.append("www.github.com/"+val)
+                else:
+                    links.append(None)
+                
+        self.addText(store,x = midx,font=font,size=size,colour=colour,link=links,multi=" | ")
         
-        if x < inset:
-            x = inset
+    def addText(self,text,x=None,y=None,
+                font="text",size="text",colour="text",link=None,multi=" ",
+                align=[0,0],rot=0,
+                step=True):
+        #smarter call for FPDF.cell function
+        #place an aligned text cell exactly bounding the text
         
+        #if no x,y given, use the current cursor position
+        #font and size default to regular text
+        #alignment is the x/y of the corner chosen. 0-1 range
+        #rot is clockwise rotation
+        
+        ptmm = 0.352778 #points to mm conversion
+        
+        if not x:
+            x = self.get_x()
+        if not y:
+            y = self.get_y()
+            
+        self.step_y()
+        
+        #if lists, call multiple times and return
+        #alignment persists over whole block
+        if type(text) == list:
+            
+            # print("list of texts, using recursion")
+            
+            widths = [0]
+            heights = []
+            texts = []
+            sizes = []
+            fonts = []
+            links = []
+            colours = []
+            
+            for i in range(len(text)):
+                
+                tempText = text[i]
+                
+                if type(size) == list:
+                    tempSize = size[min(i,len(size))]
+                else:
+                    tempSize = size
+                    
+                if type(font) == list:
+                    tempFont = font[min(i,len(font))]
+                else:
+                    tempFont = font
+                
+                if type(link) == list:
+                    tempLink = link[min(i,len(link))]
+                else:
+                    tempLink = link
+                
+                if type(colour) == list:
+                    tempColour = colour[min(i,len(colour))]
+                else:
+                    tempColour = colour
+                             
+                if i != len(text) -1:
+                    tempText += multi
+                
+                self.set_font(self.font[tempFont], size = self.fontsize[tempSize])
+                widths.append(self.get_string_width(tempText))
+                heights.append(self.fontsize[tempSize]*ptmm)
+                
+                texts.append(tempText)
+                sizes.append(tempSize)
+                fonts.append(tempFont)
+                links.append(tempLink)
+                colours.append(tempColour)
+                
+            basex = x - sum(widths)/2 #centre point      
+            
+            for i in range(len(texts)):
+                
+                tempText = texts[i]
+                tempSize = sizes[i]
+                tempFont = fonts[i]
+                tempColour = colours[i]
+                
+                if link:
+                    tempLink = link[min(i,len(link))]
+                else:
+                    tempLink = None
+                print("{}, adding {}".format(tempText,sum(widths[:i+1])))
+                tempx = basex + sum(widths[:i+1])
+                tempy = y + max(heights) #base aligned if the sizes differ
+                
+                if type(tempText) == list:
+                    raise Exception("multi-layered recursion found, halting")
+                    
+                self.addText(tempText,tempx,tempy,tempFont,tempSize,tempColour,tempLink, align = [0,1]) 
+            
+            #do not process for listed inputs
+            return
+           
+        text = text.replace("\n"," ")
+        
+        self.set_font(self.font[font], size = self.fontsize[size])    
+        self.set_text_color(*self.colour[colour])
+        width = round(self.get_string_width(text),2)
+        height = self.fontsize[size]*ptmm 
+        
+            
+        print("adding text {}... at {},{} (align {})".format(text[:5],round(x,2),round(y,2),align))
+        
+        if link:
+            print("link {}".format(link))
+        
+        if self.b == 1:
+            self.drawCross(x, y, rot = 45)
+            
+        #rotate around intended coordinates, not shifted
+        rx = x
+        ry = y
+            
+        x = x - width*align[0]
+        y = y - height*align[1]
+            
         self.set_xy(x,y)
-        self.set_text_color(*fontcol)
-        self.cell(w=twidth, h=(vmargin/2)+fontsize*ptmm, align=align, txt=text, border=self.b, link = link)
-    
-        self.updatePlacement(y=y + vmargin+fontsize*ptmm)
         
-    
-    def addHeader(self,heading,sub=False):
+        if rot != 0:
+            #rotate canvas before placement
+            #-ve rotation as canvas is moving
+            self.rotate(-rot,rx,ry)
         
-        ptmm = 0.352778
+        #calculate available space
+        rotPi = math.radians(rot)
+        available = round((self.edge["r"] - x)*math.cos(rotPi) + 
+                          (self.h - y)*math.sin(rotPi),2)
         
-        if sub:
-            fontsize = self.fontsizes["subheading"]
-            self.set_font("Roboto-Bold",size=fontsize)
-            y = self.placement["y"] + 3
-            print("adding subheading {}... at y={}".format(heading,y))
+        #Round the measurements, a 0.00000000000002 difference was throwing it off
+        if width > available:
+            print("\t using justified mulitCell")
+            
+            textAlign = "J"
+            cellWidth = available
             
         else:
-            fontsize = self.fontsizes["heading"]
-            self.set_font("Roboto-Bold",size=fontsize)
-            y = self.placement["y"] + 6
-            print("adding heading {}... at y={}".format(heading,y))
+            # self.cell(width, height, text, border = self.b, align = "C", link=link)
+            textAlign = "L"
+            cellWidth = width*1.0005 #multicell is very trigger happy on the newlines
         
+        if link:
+            self.cell(width, height, text, border = self.b, align = "C", link=link)
+        else:
+            self.multi_cell(cellWidth, height, text, border = self.b, align = textAlign)
         
-        fontcol = self.colours["main"]
+        if rot != 0:
+            #fix any rotation
+            self.rotate(0,rx,ry)
         
-        inset = self.inset
-        margin = self.margin
-        vmargin = self.vmargin
+        if self.b == 1:
+            self.drawCross(x, y)
         
-        twidth = self.get_string_width(heading)
-        self.set_xy(inset,y)
-        self.set_text_color(*fontcol)
-        self.cell(w=twidth+margin, h=(vmargin)+fontsize*ptmm,txt=heading,border=self.b)
+        nLines = math.ceil(width/available)
         
-        #x at edge margin
-        x = inset+twidth + margin
-        y =  y-(margin/4)+fontsize*ptmm
-        
-        self.set_draw_color(*self.colours["main"])
-        if not sub:
-            self.line(x,y ,self.w-inset,y)
-        
-        self.updatePlacement(y=y)
-        
-    def addName(self, name, bold = "last"):
-        
-        
-        name = name.split(" ")
-        
-        #get name cell sizes
-        sizes = [0]
-        for i in range(len(name)):
-            if (i == len(name) -1) and (bold == "last"):
-                self.set_font(self.font_norm,size = self.fontsizes["name"])
-            else:
-                self.set_font(self.font_bold,size = self.fontsizes["name"])
+        #prevent runaway pages
+        if (y > self.h - (self.t_margin + self.b_margin)) and not self.commandState == "footer":
+            print("oh shit "*24)
             
-            temp = name[i]
-            sizes.append(self.get_string_width(temp))
+            self.set_y(0)
         
+        if step:
+            self.step_y()
         
-        midx = self.w/2
-        for i in range(len(name)):
-            temp = name[i]
-            x = midx - sum(sizes)/2 + sum(sizes[:i+1])
-            
-            x+= i*2 #extra spacing
-            
-            if (i == len(name) -1) and (bold == "last"):
-                self.textCell(x, 6, temp, self.font_bold, size = "name", align = "R")
-            else:
-                self.textCell(x, 6, temp, self.font_norm, size = "name", align = "R")
-    
-    def addContacts(self,mob,email,git=None):
-        data = {}
-        fields = ["mobile","email","git"]
+        #return original bounding box
+        return(x,y,x+width,y+height*nLines)
         
-        i=0
-        for item in mob, email, git:
-            data[fields[i]] = item
-            
-            i+=1
-        
-        font = "Roboto-Regular"
-        
-        self.set_font(font,size = self.fontsizes["contact"])
-        self.set_text_color(*self.colours["main"])
-        sizes = [0]
-        
-        i = 0
-        for item in data.keys():
-            if i != 0:
-                text = " | "
-            else:
-                text = ""
+    def addHeader(self,heading,sub=False,rotated=False):
                 
-            text += item +": " + data[item]
-            
-            sizes.append(self.get_string_width(text))
-            
-            i += 1            
+        self.step_y(self.ybuffer*3)
         
-        midx = self.w/2
-        y = self.placement["y"]
-        i = 0
-        for item in data.keys():
-            text = data[item]
-            x = midx - sum(sizes)/2 + sum(sizes[:i+1])
-            
-            x+= i #extra spacing
-            
-            if i != 0:
-                text = " | "
+        y = self.get_y()
+        
+        if not rotated:
+        
+            if sub:
+                y += 3
+                print("adding subheading {}... at y={}".format(heading,y))
+                box = self.addText(heading,font = "bold",colour = "main" ,size="subheading")
+                
             else:
-                text = ""
+                y += 6
+                print("adding heading {}... at y={}".format(heading,y))
+                box = self.addText(heading,font = "bold",colour = "main", size="subheading")
                 
-            text += item +": " + data[item]
+            self.set_draw_color(*self.colour["main"])
             
-            if item == "git":
-                link = "www.github.com/"+data[item]
-            else:
-                link = None
-            
-            self.textCell(x, y, text, font, size = "contact", align = "R",link=link)
-            
-            i += 1            
-            
-    def addTitleSection(self, name, addr, num, email, git):
-        
-        midx = self.w/2
-        print("adding name")
-        self.addName(name)
-        print("adding address")
-        
-        self.textCell(midx, self.placement["y"], addr, "Roboto-Italic", size = "contact", colour = "light", align = "C")
-        
-        print("adding contacts")
-        self.addContacts(num, email, git)
-        
-        
-    def addBulkText(self,text,font = "Roboto-Light", extramargin = 3):
-        
-        text = text.replace("\n", " ")
-        
-        x = self.inset
-        y = self.placement["y"] + extramargin
-        
-        self.set_xy(x,y)
-        self.set_font(font)
-        self.set_text_color(*self.colours["text"])
-        self.set_font_size(self.fontsizes["text"])
-        h = self.fontsizes["text"]/2
-        w = self.w - self.inset*2
-        
-        self.multi_cell(w,h,text,border=self.b)
-        
-        self.updatePlacement()
-        
-    def addList(self,listvals,font = "Roboto-Light", extramargin = 0, headings = False):        
-        
-        
-        ptmm = 0.352778
-        
-        self.updatePlacement(y=self.placement["y"] + extramargin)
-        
-        if not headings:
-            for item in listvals:
+            if not sub:
                 
-                item = "• " + item
+                y = box[1] + (box[3]-box[1]) * 3/4
                 
-                self.addBulkText(item, font, extramargin = 0)
+                self.line(box[2]+1, y ,self.width-self.r_margin, y)
                 
         else:
-            basey = self.placement["y"]
             
-            # self.font_bold = "Roboto-Bold"
-            # self.font_norm = "Roboto-Thin"
-            heads = []
-            bodies = []
-            for item in listvals:
-                heads.append(item.split("-")[0].strip())
-                bodies.append(item.split("-")[1].strip())
-                
-            #find longest heading to index from
-            maxlen = max(heads, key=len)
-            
-            fsize = self.fontsizes["text"]            
-            self.set_font(self.font_bold)
-            self.set_font_size(fsize)
-            
-            maxw = self.get_string_width(maxlen)
-            midx = self.inset + maxw + self.margin
-            
-            for i in range(len(heads)):
-                x = midx
-                y = basey + i*fsize/2
-                
-                print(x,y)
-                self.set_xy(x,y)
-                self.cell(maxw, ptmm*fsize, txt = heads[i], border=self.b, align = "R")
-                
-            self.set_font(self.font_norm)
-            for i in range(len(bodies)):                
-                
-                x = midx + maxw
-                y = basey + i*fsize/2
-                
-                print(x,y)
-                self.set_xy(x,y)
-                self.cell(maxw, ptmm*fsize, txt = bodies[i], border=self.b, align = "L")
+            #add fancy rotated headers
+            pass
         
+        self.step_y()
+    
     def addDateBlock(self,block):
         #constant functions to head the block
         const = {"who":None,
@@ -523,11 +646,10 @@ class CV(FPDF):
                  "where":None,
                  "when":None}
         
-        # x,y,text,font,size="text",colour="main",align = 'C',link=None
-        styles = {"who":[0,0,"Roboto-Bold","text","main"],
-                 "what":[0,1,"Roboto-Regular","text","text"],
-                 "where":[1,0,"Roboto-Italic","text","accent"],
-                 "when":[1,1,"Roboto-Italic","text","text"]}
+        styles = {"who":[0,0,"bold","text","main"],
+                 "what":[0,1,"text","text","text"],
+                 "where":[1,0,"italic","text","accent"],
+                 "when":[1,1,"italic","text","text"]}
         
         subs = {}
         
@@ -541,7 +663,7 @@ class CV(FPDF):
                 subs[key] = block[key]
                 
         #handle main secton
-        basey = self.placement["y"]
+        basey = self.get_y() + self.ybuffer
         for key in const.keys():
             
             text = const[key]
@@ -551,61 +673,70 @@ class CV(FPDF):
             size = styles[key][3]
             colour = styles[key][4]
             
+            print(text,font,size,colour)
+            
             if gridx == 0:
-                x = self.inset
+                x = self.l_margin
             else:
-                x = self.w - self.inset
+                x = self.width - self.r_margin
             
             if gridy == 0:
-                y = basey + 4
+                box = self.addText(text, x, basey, font, size, colour, align = [gridx,0])
+                lowy = box[3]+self.ybuffer
             else:
-                y = basey + 8
-            
-            self.textCell(x, y, text, font, size, colour)
-            
+                box = self.addText(text, x, lowy, font, size, colour, align = [gridx,0])
+                    
+        #between bulk date block and supplimentary details
+        self.step_y() #add some separation
+                
         for com in subs.keys():
             arg = subs[com][0]
             val = subs[com][1]
-            if com == "bulktext":
+            
+            self.processCommand(com,arg,val)
+            
+        self.step_y(self.ybuffer) #add some separation after block
                 
-                self.addBulkText(val, extramargin = 1)     
-                    
-            if com == "subheading":
+    def addList(self, listvals, headings = False):
+        
+        if not headings:
+            heads = ["• "]*len(listvals)
+            bodies = listvals
                 
-                self.addHeader(arg,sub=True)
+        else:
+            
+            heads = []
+            bodies = []
+            for item in listvals:
+                heads.append(item.split("|")[0].strip())
+                bodies.append(item.split("|")[1].strip())
                 
-            if com == "list":
-                
-                print("create list:")
-                print("\t",arg,val)
-                
-                self.addList(val)
+        y = self.get_y() 
+        
+        #find longest heading to index from
+        maxlen = max(heads, key=len)
+        
+        fsize = "text"
+        
+        maxw = self.get_string_width(maxlen)
+        midx = self.l_margin + maxw
+        
+        for i in range(len(heads)):
+            x = midx
+            
+            self.addText(heads[i], x, y, font = "bold", size = fsize, align = [1,0],step=False)
+            self.addText(bodies[i], x+self.xbuffer, y, font = "text", size = fsize, align = [0,0],step=False)
+            
+            y = self.get_y() + self.ybuffer
+               
+        y = self.step_y()
         
     def save(self):
         self.output("testcv.pdf")
-    
-    
-    
+
 if __name__ == "__main__":
-    
-    cv = CV()    
-    cv.inert()
-    cv.save()
-    """
-    print("\n"+"#"*24)
-    print("scanning CV text contents for repeated language")
-    print("#"*24)
     
     content = parseText()
     
-    bulkcontent = list(content.loc[content["command"].isin(("bulktext","list"))]["values"])
-    
-    prescan = ""
-    for item in bulkcontent:
-        if type(item) == list:
-            prescan += " ".join(item)
-            
-        else:
-            prescan += item
-            
-    wordstats.process(prescan,False)"""
+    cv = PDF()    
+    cv.create()
