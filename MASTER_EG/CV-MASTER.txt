@@ -1,0 +1,87 @@
+//info(name) firstName lastName
+//info(address) 10 someLane, someTown, someRegion, 1AB C23
+//info(mobile) 01234 567890
+//info(email) email@mail.com
+//info(github) elberUno
+
+//heading(Personal Profile)
+//bulktext()
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. 
+Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. 
+Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. 
+Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+//heading(Formal Education)
+//dated()
+
+//who(University)
+//what(Degree Title)
+//where(Location, Country)
+//when(startTime - endTime)
+
+//headlist()
+
+Final Grade: | 1st class degreeTitle
+Graduate Thesis: | "Lorem ipsum dolor sit amet"
+//enddated()
+
+//heading(Summary of Skills)
+//headlist()
+
+Skill1 | Language1 (10 years), Language2 (3 years)
+Skill2 | Lorem ipsum dolor sit amet
+
+
+//heading(Professional Experience)
+//dated()
+
+//who(companyName)
+//what(jobTitle)
+//where(Location, Country)
+//when(startTime - endTime)
+
+//list()
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. 
+Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. 
+Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. 
+Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. 
+Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. 
+Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. 
+Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+//nextdated()
+
+//who(companyName)
+//what(jobTitle)
+//where(Location, Country)
+//when(startTime - endTime)
+
+//list()
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. 
+Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. 
+Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. 
+Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. 
+Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. 
+
+//newpage()
+//nextdated()
+
+//who(companyName)
+//what(jobTitle)
+//where(Location, Country)
+//when(startTime - endTime)
+
+//list()
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. 
+Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. 
+Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. 
+
+//enddated()
+
+//heading(Languages)
+//headlist()
+Language1 | Native
+Language2 | Intermediate
+
+//footer(full)

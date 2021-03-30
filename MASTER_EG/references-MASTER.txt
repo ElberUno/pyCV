@@ -1,0 +1,23 @@
+//doctype(letter)
+
+//info(name) firstName lastName
+//info(address) 10 someLane, someTown, someRegion, 1AB C23
+//info(mobile) 01234 567890
+//info(email) email@mail.com
+//info(github) elberUno
+
+//spacer(10)
+
+//heading(Reference Details)
+
+//subheading(refName)
+Phone: | 01234 012345
+Email: | ref.mail@mail.com
+
+//subheading(refName)
+Phone: | 01234 012345
+Email: | ref.mail@mail.com
+
+//subheading(refName)
+Phone: | 01234 012345
+Email: | ref.mail@mail.com

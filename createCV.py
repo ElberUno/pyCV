@@ -13,7 +13,7 @@ from datetime import datetime
 from shutil import copyfile
 
 fonts = os.listdir('font/')
-icons = os.listdir('icon/')
+# icons = os.listdir('icon/')
 
 
 #### debug ####
@@ -828,14 +828,15 @@ def copyFile(target, destination, overwrite = False):
 if __name__ == "__main__":
     
     replacements = {"job":"testjob",
-                    "company":"bigCompany"}
+                    "company":"bigCompany",
+                    "location":"bigCity"}
     
     job = "testJob"
     
     files = ["cv","references","coverletter"]
     
     cwd = os.getcwd()
-    masterfolder = cwd + "\\master\\"
+    masterfolder = cwd + "\\master_eg\\"
     targetfolder = cwd + "\\applications\\{}\\".format(replacements["company"])
     
     for file in files:

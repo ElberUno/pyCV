@@ -1,0 +1,44 @@
+//doctype(cover letter)
+
+//info(name) firstName lastName
+//info(address) 10 someLane, someTown, someRegion, 1AB C23
+//info(mobile) 01234 567890
+//info(email) email@mail.com
+//info(github) elberUno
+
+//spacer(10)
+
+//subheading(Cover Letter for {company})
+//list()
+Application for {job} position at {company}, {location}
+
+
+//heading(Why {company}?)
+
+//bulktext()
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. 
+Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. 
+Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. 
+Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+//heading(Why Me?)
+
+//bulktext()
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. 
+Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. 
+Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. 
+Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+//spacer(10)
+//bulktext()
+
+Finishing text. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. 
+
+//spacer()
+//bulktext()
+Best Regards,
+//bulktext()
+firstName
+
+//footer(full)
