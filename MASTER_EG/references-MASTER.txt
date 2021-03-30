@@ -11,13 +11,17 @@
 //heading(Reference Details)
 
 //subheading(refName)
+//headlist()
+Phone: | 01234 012345
+Email: | ref.mail@mail.com
+//endlist()
+
+//subheading(refName)
+//headlist()
 Phone: | 01234 012345
 Email: | ref.mail@mail.com
 
 //subheading(refName)
-Phone: | 01234 012345
-Email: | ref.mail@mail.com
-
-//subheading(refName)
+//headlist()
 Phone: | 01234 012345
 Email: | ref.mail@mail.com
