@@ -1,8 +1,20 @@
 # pyCV
 Python CV compiler to replace LaTeX attempts
 
-## available commands
-# supplimentary control commands
+# housekeeping
+pyCV will read a source file (examples provided) and build your cv, cover letter and reference table as a pdf document.
+
+source files are formatted with a command starting with // and being the first element on a line. Some commands require arguments, others are optional
+
+items bounded by {brackets} can be replaced at compile, provided the "replacements" dict is formatted properly (at the bottom of the script)
+simply add a new item to the dict, where the key is the text in the brackets and the value is the desired text. The coverletter example has this set already, but to add more:
+
+eg for {favouriteColour}
+
+add "favouriteColour":"colourToReplce",
+
+# available commands
+## supplimentary control commands
     info(arg)
 gives info to heading used on documents
 
