@@ -5,12 +5,12 @@ Created on Sat Mar 13 19:22:13 2021
 @author: Louis Beal
 """
 
-import os,io,sys,pathlib,math
+import os,io,pathlib,math,re
 import pandas as pd
-import numpy as np
 
 from fpdf import FPDF
 from datetime import datetime
+from shutil import copyfile
 
 fonts = os.listdir('font/')
 icons = os.listdir('icon/')
@@ -20,9 +20,9 @@ icons = os.listdir('icon/')
 debug = False
 ###############
 
-def parseText():
+def parseText(filepath = "content.txt"):
     
-    with io.open("content.txt","r",encoding="utf-8") as o:
+    with io.open(filepath,"r",encoding="utf-8") as o:
         #read content file, splitting by section
         content = o.read().split("//")
         
@@ -55,7 +55,8 @@ class PDF(FPDF):
     
     #need to extend FPDF for footer to function properly
 
-    def create(self,
+    def create(self,filepath,outpath="CV.pdf",
+               replacements = None,
                maincolour = [60,60,60],
                textcolour = [90,90,90],
                lightcolour = [140,140,140],
@@ -65,7 +66,7 @@ class PDF(FPDF):
         
         
         #supplimentary data
-        self.version = "v0.0.2"
+        self.version = "v0.0.3"
         
         #templating, set colours, font sizes and font tables
         self.colour = {"main":maincolour,
@@ -84,6 +85,15 @@ class PDF(FPDF):
                      "text":"Roboto-Regular",
                      "italic":"Roboto-Italic"}
         
+        self.filepath = filepath
+        
+        if "." not in outpath:
+            outpath += ".pdf"            
+        self.outpath = outpath
+        
+        #set replacement variables        
+        self.variables = replacements
+        
         #init blank pdf
         self.initialisation()
         #set layout settings
@@ -100,7 +110,7 @@ class PDF(FPDF):
         self.commandState = "run"
         self.store = []
         self.temp = {}
-        self.textContent = ""
+        self.textContent = []
         
         i = 0
         while i < len(self.content):
@@ -115,24 +125,23 @@ class PDF(FPDF):
         
         self.save()
         
+        return(self.concatContent())
+        
     def initialisation(self):
         #initialise a blank PDF for compilation        
         self.addFonts() #add fonts
         self.set_margins(0,0,0) #remove automatic margins
         
-        #set manual margins and x/y spacing for cells
-        self.xbuffer = 2.5
-        self.ybuffer = 1
-        
         #placement cursor, keep track for sequential cell addition
         self.cursor = {"x":0,"y":0}
         
         #parse content into commands, arguments and text
-        self.content = parseText()
+        self.content = parseText(self.filepath)
         
         #extract needed info such as document type, name, footer info, etc.
-        self.userName = self.extractFromContent("info","name")        
-        self.footerType = self.extractFromContent("footer")            
+        self.doctype = self.extractFromContent("doctype")      
+        self.footerType = self.extractFromContent("footer")    
+        self.userName = self.extractFromContent("info","name")            
         self.sidebar = self.extractFromContent("sidebar")
         
         
@@ -142,7 +151,9 @@ class PDF(FPDF):
         
     def layout(self):
         
-        #set margins, using internal margins
+        #set manual margins and x/y spacing for cells
+        self.xbuffer = 2.5
+        self.ybuffer = .92
         
         if self.sidebar:
             #using a sidebar, start here by cutting the page
@@ -180,15 +191,20 @@ class PDF(FPDF):
             
             if command in list(self.content["command"]):
                 val = self.content.loc[(self.content["command"] == command)]["args"].values[0]
-                return val.lower() != "false"
+                return val
+            
             else:
                 return None
             
         else:
             
-            return self.content.loc[(self.content["command"] == command) & 
+            if command in list(self.content["command"]):
+                return self.content.loc[(self.content["command"] == command) & 
                                     (self.content["args"] == args)]["values"].values[0]
     
+            else:
+                return None
+            
     def addFonts(self):
         
         #read in fonts and add them to the PDF for usage
@@ -257,6 +273,13 @@ class PDF(FPDF):
                 #force new page by writing empty string to end of page and resetting y
                 self.addText(text="",x=self.l_margin,y = self.h,font="thin")
                 self.set_y(self.t_margin)
+            
+            elif com == "spacer":
+                
+                if arg:
+                    self.step_y(int(arg))
+                else:
+                    self.step_y()
                 
             elif com == "info":
                 self.commandState = "info"
@@ -268,7 +291,8 @@ class PDF(FPDF):
             elif com == "heading":
                 self.addHeader(arg)
                 
-            elif com == "bulktext":                
+            elif com == "bulktext":     
+                self.textContent.append(val)
                 self.addText(val)
                 
             elif com == "dated":        
@@ -286,6 +310,18 @@ class PDF(FPDF):
                 print("\t",arg,val)
                 
                 self.addList(val, headings = True)            
+    
+    
+
+    def formatText(self,text):
+        
+        for key in self.variables.keys():
+            target = "{"+key+"}"
+            val = self.variables[key]
+            
+            text = text.replace(target,val)
+        
+        return(text)
     
     #### override default functions ####    
     def set_x(self, x):
@@ -333,13 +369,26 @@ class PDF(FPDF):
             y = self.h - 10
             
             #print centered "name    cv"
-            footerText = "{}    ~    {}".format(self.userName, "Curriculum Vitae")
+            
+            if self.doctype:
+                doctype = self.doctype.title()
+            else:
+                doctype = "Curriculum Vitae"
+            
+            if self.userName:
+                name = self.userName
+            
+                footerText = "{}    ~    {}".format(name, doctype)
+            
+            else:
+                footerText = doctype
+            
             x = self.w/2
             self.addText(footerText,x,y,font = "text",
                          size="contact",colour= "light",align = [0.5,0])
             
             # Print page number on right        
-            pageNo = "Page {}/{}".format(self.page_no(),self.alias_nb_pages())
+            pageNo = "Page {}/{}".format(self.page_no(), self.alias_nb_pages())
             x = self.w - self.margins
             self.addText(pageNo,x,y,font = "text",
                          size="contact",colour= "light",align = [1,0])
@@ -535,13 +584,15 @@ class PDF(FPDF):
            
         text = text.replace("\n"," ")
         
+        text = self.formatText(text)
+        
         self.set_font(self.font[font], size = self.fontsize[size])    
         self.set_text_color(*self.colour[colour])
         width = round(self.get_string_width(text),2)
         height = self.fontsize[size]*ptmm 
         
-            
-        print("adding text {}... at {},{} (align {})".format(text[:5],round(x,2),round(y,2),align))
+        if self.commandState != "footer": 
+            print("adding text {}... at {},{} (align {})".format(text[:5],round(x,2),round(y,2),align))
         
         if link:
             print("link {}".format(link))
@@ -594,17 +645,10 @@ class PDF(FPDF):
         
         nLines = math.ceil(width/available)
         
-        #prevent runaway pages
-        if (y > self.h - (self.t_margin + self.b_margin)) and not self.commandState == "footer":
-            print("oh shit "*24)
-            
-            self.set_y(0)
-        
         if step:
             self.step_y()
-        
-        #return original bounding box
-        return(x,y,x+width,y+height*nLines)
+            
+        return(width , height*nLines)
         
     def addHeader(self,heading,sub=False,rotated=False):
                 
@@ -617,20 +661,21 @@ class PDF(FPDF):
             if sub:
                 y += 3
                 print("adding subheading {}... at y={}".format(heading,y))
-                box = self.addText(heading,font = "bold",colour = "main" ,size="subheading")
+                w,h = self.addText(heading,font = "bold",colour = "main" ,size="subheading")
                 
             else:
                 y += 6
                 print("adding heading {}... at y={}".format(heading,y))
-                box = self.addText(heading,font = "bold",colour = "main", size="subheading")
+                w,h = self.addText(heading,font = "bold",colour = "main", size="subheading")
                 
             self.set_draw_color(*self.colour["main"])
             
             if not sub:
                 
-                y = box[1] + (box[3]-box[1]) * 3/4
+                y = self.get_y() - h * .4
+                x = self.get_x() + w + .5
                 
-                self.line(box[2]+1, y ,self.width-self.r_margin, y)
+                self.line(x, y ,self.width-self.r_margin, y)
                 
         else:
             
@@ -681,11 +726,11 @@ class PDF(FPDF):
                 x = self.width - self.r_margin
             
             if gridy == 0:
-                box = self.addText(text, x, basey, font, size, colour, align = [gridx,0])
-                lowy = box[3]+self.ybuffer
+                self.addText(text, x, basey, font, size, colour, align = [gridx,0])
+                lowy = self.get_y()+self.ybuffer
             else:
-                box = self.addText(text, x, lowy, font, size, colour, align = [gridx,0])
-                    
+                self.addText(text, x, lowy, font, size, colour, align = [gridx,0])
+               
         #between bulk date block and supplimentary details
         self.step_y() #add some separation
                 
@@ -702,15 +747,15 @@ class PDF(FPDF):
         if not headings:
             heads = ["• "]*len(listvals)
             bodies = listvals
+            self.textContent.append(bodies)
                 
-        else:
-            
+        else:            
             heads = []
             bodies = []
             for item in listvals:
                 heads.append(item.split("|")[0].strip())
                 bodies.append(item.split("|")[1].strip())
-                
+       
         y = self.get_y() 
         
         #find longest heading to index from
@@ -724,19 +769,85 @@ class PDF(FPDF):
         for i in range(len(heads)):
             x = midx
             
-            self.addText(heads[i], x, y, font = "bold", size = fsize, align = [1,0],step=False)
+            w,h = self.addText(heads[i], x, y, font = "bold", size = fsize, align = [1,0],step=False)
+            
+            if self.get_y() < y:
+                #if heading is drawn on a new page,
+                #the text will cause a second added page
+                y = self.get_y()-h
+                
             self.addText(bodies[i], x+self.xbuffer, y, font = "text", size = fsize, align = [0,0],step=False)
             
             y = self.get_y() + self.ybuffer
                
         y = self.step_y()
         
+    def concatContent(self,content=None):
+        
+        #recursive content concatenation
+        
+        output = ""
+        
+        #nothing is passed on first call, use main content
+        if not content:
+            content = self.textContent
+        
+        for item in content:
+            if type(item) == list:
+                item = self.concatContent(item)
+                
+            output += self.formatText(item)+ "\n"
+            
+        return(output)
+        
     def save(self):
-        self.output("testcv.pdf")
+        
+        print("\toutputting {}".format(self.outpath))
+        
+        self.output(self.outpath)
+    
+def copyFile(target, destination, overwrite = False):
+    
+    #create destination path if needed
+    destPath = "\\".join(destination.split("\\")[:-1]) + "\\"
+    if not os.path.exists(destPath):
+        print("creating folder {}".format(destPath))
+        
+        os.mkdir(destPath)
+    else:
+        print("destination folder already exists")
+    
+    if not os.path.exists(destination):
+        copyfile(target,destination)
+    elif overwrite:
+        print("\tfile already exists, overwriting")
+        copyfile(target,destination)        
+    else:
+        print("\tfile already exists, skipping")
 
 if __name__ == "__main__":
     
-    content = parseText()
+    replacements = {"job":"testjob",
+                    "company":"bigCompany"}
     
-    cv = PDF()    
-    cv.create()
+    job = "testJob"
+    
+    files = ["cv","references","coverletter"]
+    
+    cwd = os.getcwd()
+    masterfolder = cwd + "\\master\\"
+    targetfolder = cwd + "\\applications\\{}\\".format(replacements["company"])
+    
+    for file in files:
+        
+        masterfile = masterfolder + file + "-MASTER.txt"
+        sourcefile = targetfolder + file + ".txt"
+        outputfile = targetfolder + file + ".pdf"
+        
+        #copy source files to master folder before execution
+        #files can be edited en situ for fine tuning
+        copyFile(masterfile, sourcefile)
+        
+        cv = PDF()    
+        
+        text = cv.create(sourcefile,outputfile,replacements)
