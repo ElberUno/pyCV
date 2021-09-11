@@ -5,16 +5,20 @@ Created on Sat Mar 13 19:22:13 2021
 @author: Louis Beal
 """
 
-import os,io,pathlib,math,re
+import os
+import io
+import re
+import math
+import pathlib
+import logging
+
 import pandas as pd
 
 from fpdf import FPDF
 from datetime import datetime
 from shutil import copyfile
 
-fonts = os.listdir('font/')
-# icons = os.listdir('icon/')
-
+fonts = [f for f in os.listdir('font/') if ".ttf" in f]
 
 #### debug ####
 debug = False
@@ -64,9 +68,8 @@ class PDF(FPDF):
         
         #driver function to read in data and compile the PDF
         
-        
         #supplimentary data
-        self.version = "v0.0.3"
+        self.version = "v0.3.1"
         
         #templating, set colours, font sizes and font tables
         self.colour = {"main":maincolour,
@@ -207,7 +210,7 @@ class PDF(FPDF):
             
     def addFonts(self):
         
-        #read in fonts and add them to the PDF for usage
+        # read in fonts and add them to the PDF for usage
         
         for fontName in fonts:
             name = fontName.split(".")[0]
@@ -216,9 +219,14 @@ class PDF(FPDF):
             if ttype in ["ttf"]:
                 path = str(pathlib.Path().absolute()) + "\\font\\" + fontName
                 
-                self.add_font(family=name,fname=path, uni= True)
+                #fpdf internal add_font call
+                self.add_font(family=name, fname=path, uni= True)
+                
+                # print('added font ' + name + ' (' + path + ')')
         
     def enableDebug(self):
+        
+        # enables drawing of debug boundaries on output
         
         self.b = 1
         
@@ -229,8 +237,10 @@ class PDF(FPDF):
         
     def processCommand(self,com,arg,val):
         
-        #command states override other commands
-        #allows for nested items
+        # command handler
+        
+        # command states override other commands
+        # allows for nested items
         state = self.commandState
         if state == "dated":
             
@@ -570,7 +580,7 @@ class PDF(FPDF):
                     tempLink = link[min(i,len(link))]
                 else:
                     tempLink = None
-                print("{}, adding {}".format(tempText,sum(widths[:i+1])))
+                print("{}, adding {}".format(tempText, sum(widths[:i+1])))
                 tempx = basex + sum(widths[:i+1])
                 tempy = y + max(heights) #base aligned if the sizes differ
                 
@@ -827,6 +837,11 @@ def copyFile(target, destination, overwrite = False):
 
 if __name__ == "__main__":
     
+    logging.basicConfig(filename = './create.log', filemode = 'w', 
+                        level = logging.INFO, 
+                        format='%(asctime)s - %(levelname)s - %(message)s',
+                        force = True)
+    
     replacements = {"job":"testjob",
                     "company":"bigCompany",
                     "location":"bigCity"}
@@ -836,7 +851,7 @@ if __name__ == "__main__":
     files = ["cv","references","coverletter"]
     
     cwd = os.getcwd()
-    masterfolder = cwd + "\\master_eg\\"
+    masterfolder = cwd + "\\master\\"
     targetfolder = cwd + "\\applications\\{}\\".format(replacements["company"])
     
     for file in files:
