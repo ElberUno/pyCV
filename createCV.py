@@ -35,9 +35,13 @@ def parseText(filepath = "content.txt"):
     data = {"command":[],"args":[],"values":[]}
     for item in content:
             
-        #index brackets from start and split on those indices
+        #find outer brackets for splitting
         b1 = item.index("(")
         b2 = item.index(")")
+        
+        # exception to allow brackets in headers
+        if "))" in item:
+            b2 += 1
         
         com = item[:b1].strip()
         arg = item[b1+1:b2].strip()
@@ -122,7 +126,7 @@ class PDF(FPDF):
             arg = self.content.iat[i,1]
             val = self.content.iat[i,2]
             
-            self.processCommand(com,arg,val)
+            self.processCommand(com, arg, val)
             
             i += 1
         
@@ -156,7 +160,7 @@ class PDF(FPDF):
         
         #set manual margins and x/y spacing for cells
         self.xbuffer = 2.5
-        self.ybuffer = .92
+        self.ybuffer = .95
         
         if self.sidebar:
             #using a sidebar, start here by cutting the page
@@ -235,7 +239,7 @@ class PDF(FPDF):
                        self.width-self.r_margin,
                        self.h-self.b_margin)
         
-    def processCommand(self,com,arg,val):
+    def processCommand(self, com, arg, val):
         
         # command handler
         
@@ -249,6 +253,7 @@ class PDF(FPDF):
                 self.commandState = "run"
                 self.store.append(self.temp)
                 self.temp = {}
+                
                 for block in self.store:
                     
                     self.addDateBlock(block)
@@ -260,7 +265,7 @@ class PDF(FPDF):
                 self.temp = {}
                 
             else:
-                self.temp[com] = (arg,val)
+                self.temp[com] = (arg, val)
                 
         elif state == "info":
             
@@ -271,7 +276,7 @@ class PDF(FPDF):
                 self.addInfo()
                 
                 self.commandState = "run"                
-                self.processCommand(com,arg,val)
+                self.processCommand(com, arg, val)
                 
             else:                
                 self.temp[arg] = val
@@ -329,7 +334,7 @@ class PDF(FPDF):
             target = "{"+key+"}"
             val = self.variables[key]
             
-            text = text.replace(target,val)
+            text = text.replace(target, val)
         
         return(text)
     
@@ -694,8 +699,9 @@ class PDF(FPDF):
         
         self.step_y()
     
-    def addDateBlock(self,block):
+    def addDateBlock(self, block):
         #constant functions to head the block
+        
         const = {"who":None,
                  "what":None,
                  "where":None,
@@ -748,7 +754,7 @@ class PDF(FPDF):
             arg = subs[com][0]
             val = subs[com][1]
             
-            self.processCommand(com,arg,val)
+            self.processCommand(com, arg, val)
             
         self.step_y(self.ybuffer) #add some separation after block
                 
@@ -849,6 +855,7 @@ if __name__ == "__main__":
     job = "testJob"
     
     files = ["cv","references","coverletter"]
+    files = ["cv"]
     
     cwd = os.getcwd()
     masterfolder = cwd + "\\master\\"
@@ -862,7 +869,7 @@ if __name__ == "__main__":
         
         #copy source files to master folder before execution
         #files can be edited en situ for fine tuning
-        copyFile(masterfile, sourcefile)
+        copyFile(masterfile, sourcefile, True)
         
         cv = PDF()    
         
