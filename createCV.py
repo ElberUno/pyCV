@@ -212,8 +212,7 @@ class PDF(FPDF):
             else:
                 return None
             
-    def addFonts(self):
-        
+    def addFonts(self):        
         # read in fonts and add them to the PDF for usage
         
         for fontName in fonts:
@@ -228,8 +227,7 @@ class PDF(FPDF):
                 
                 # print('added font ' + name + ' (' + path + ')')
         
-    def enableDebug(self):
-        
+    def enableDebug(self):        
         # enables drawing of debug boundaries on output
         
         self.b = 1
@@ -245,6 +243,9 @@ class PDF(FPDF):
         
         # command states override other commands
         # allows for nested items
+        
+        # !!! TODO: change this to a dispatch table, it's getting ridiculous
+        
         state = self.commandState
         if state == "dated":
             
@@ -280,8 +281,7 @@ class PDF(FPDF):
                 
             else:                
                 self.temp[arg] = val
-        
-        
+                
         else:
             if com == "newpage":
                 
@@ -324,9 +324,13 @@ class PDF(FPDF):
                 print("create headed list:")
                 print("\t",arg,val)
                 
-                self.addList(val, headings = True)            
-    
-    
+                self.addList(val, headings = True)     
+                
+            elif com == 'font':
+                print("setting font")
+                print('\t',arg,val)
+                self.font[arg] = val
+        
 
     def formatText(self,text):
         
@@ -412,7 +416,8 @@ class PDF(FPDF):
             version = "Compiled {}".format(datetime.now().strftime("%d %B, %Y"))        
             x = self.margins
             self.addText(version,x,y,font = "text",
-                         size="contact",colour= "light")
+                         size="contact",colour= "light",
+                         link = "https://github.com/ljbeal/pyCV")
             
             self.commandState = oldCommand
             self.edge["r"] = edgeStore
@@ -843,11 +848,6 @@ def copyFile(target, destination, overwrite = False):
 
 if __name__ == "__main__":
     
-    logging.basicConfig(filename = './create.log', filemode = 'w', 
-                        level = logging.INFO, 
-                        format='%(asctime)s - %(levelname)s - %(message)s',
-                        force = True)
-    
     replacements = {"job":"testjob",
                     "company":"bigCompany",
                     "location":"bigCity"}
@@ -855,10 +855,9 @@ if __name__ == "__main__":
     job = "testJob"
     
     files = ["cv","references","coverletter"]
-    files = ["cv"]
     
     cwd = os.getcwd()
-    masterfolder = cwd + "\\master\\"
+    masterfolder = cwd + "\\MASTER_EG\\"
     targetfolder = cwd + "\\applications\\{}\\".format(replacements["company"])
     
     for file in files:

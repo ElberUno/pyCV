@@ -1,8 +1,13 @@
+//font(bold) Roboto-Bold
+//font(italic) Roboto-Italic
+//font(text) Roboto-Regular
+//font(thin) Roboto-Thin
+
 //info(name) firstName lastName
 //info(address) 10 someLane, someTown, someRegion, 1AB C23
 //info(mobile) 01234 567890
 //info(email) email@mail.com
-//info(github) elberUno
+//info(github) octocat
 
 //heading(Personal Profile)
 //bulktext()
