@@ -157,7 +157,7 @@ class PDF(FPDF):
 
         # set manual margins and x/y spacing for cells
         self.xbuffer = 2.5
-        self.ybuffer = .95
+        self.ybuffer = 0.9
 
         if self.sidebar:
             # using a sidebar, start here by cutting the page
@@ -513,7 +513,8 @@ class PDF(FPDF):
         # alignment is the x/y of the corner chosen. 0-1 range
         # rot is clockwise rotation
 
-        ptmm = 0.352778  # points to mm conversion
+        # ptmm = 0.352778  # points to mm conversion
+        ptmm = 0.4
 
         if not x:
             x = self.get_x()
